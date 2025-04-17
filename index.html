@@ -1,0 +1,310 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trò Chơi Đoán Số</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #6366F1, #8B5CF6);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .game-container {
+            background-color: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 500px;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(90deg, #3B82F6, #8B5CF6);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        .input-group {
+            position: relative;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            border: 2px solid #d1d5db;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .input-group input:focus {
+            border-color: #6366F1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+        .history-item {
+            animation: fadeIn 0.5s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            border-radius: 50%;
+            animation: fall 3s linear forwards;
+        }
+        @keyframes fall {
+            to { transform: translateY(100vh); }
+        }
+    </style>
+</head>
+<body class="bg-indigo-500">
+    <div class="game-container">
+        <div class="header">
+            <h1 class="text-2xl font-bold mb-1">Trò Chơi Đoán Số</h1>
+            <p class="text-sm opacity-90">Hãy đoán một số từ 1 đến 100</p>
+        </div>
+        
+        <div class="p-6">
+            <div id="instructions" class="bg-blue-50 p-4 rounded-lg mb-6">
+                <h2 class="font-bold text-blue-800 mb-2 flex items-center">
+                    <i class="fas fa-info-circle mr-2"></i> Hướng dẫn
+                </h2>
+                <ul class="text-blue-700 text-sm list-disc pl-5 space-y-1">
+                    <li>Máy tính đã chọn một số bí mật từ 1 đến 100</li>
+                    <li>Nhập một số vào ô bên dưới và nhấn nút "Đoán"</li>
+                    <li>Bạn sẽ được thông báo nếu số đoán quá cao hoặc quá thấp</li>
+                    <li>Cố gắng đoán đúng với ít lần đoán nhất có thể!</li>
+                </ul>
+            </div>
+
+            <div id="game-area" class="space-y-4">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-gray-700 font-medium">Số lần đoán: <span id="guess-count" class="font-bold text-indigo-600">0</span></span>
+                    <span id="best-score" class="text-gray-700 font-medium hidden">Kỷ lục: <span id="best-score-value" class="font-bold text-green-600">0</span></span>
+                </div>
+                
+                <div class="input-group flex">
+                    <input type="number" id="guess-input" min="1" max="100" placeholder="Nhập số từ 1-100" 
+                           class="flex-grow mr-2 text-lg" autofocus>
+                    <button id="guess-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                        Đoán
+                    </button>
+                </div>
+                
+                <div id="message" class="min-h-[50px] mt-4 p-4 rounded-lg text-center font-medium hidden"></div>
+                
+                <div id="history-container" class="space-y-2 max-h-[150px] overflow-y-auto">
+                    <!-- Lịch sử đoán sẽ hiển thị ở đây -->
+                </div>
+            </div>
+            
+            <div id="result-area" class="hidden text-center space-y-4">
+                <div id="win-message" class="bg-green-100 text-green-800 p-4 rounded-lg text-lg font-bold animate-pulse"></div>
+                <div class="flex justify-center">
+                    <button id="play-again" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center">
+                        <i class="fas fa-redo mr-2"></i> Chơi lại
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Khởi tạo các biến
+            let secretNumber = generateRandomNumber(1, 100);
+            let guessCount = 0;
+            let bestScore = localStorage.getItem('bestScore') || Infinity;
+            
+            // Hiển thị kỷ lục nếu có
+            if (bestScore !== Infinity) {
+                document.getElementById('best-score').classList.remove('hidden');
+                document.getElementById('best-score-value').textContent = bestScore;
+            }
+            
+            // Lấy các phần tử DOM
+            const guessInput = document.getElementById('guess-input');
+            const guessBtn = document.getElementById('guess-btn');
+            const guessCountDisplay = document.getElementById('guess-count');
+            const messageDisplay = document.getElementById('message');
+            const historyContainer = document.getElementById('history-container');
+            const resultArea = document.getElementById('result-area');
+            const gameArea = document.getElementById('game-area');
+            const winMessage = document.getElementById('win-message');
+            const playAgainBtn = document.getElementById('play-again');
+            
+            // Xử lý sự kiện nút đoán
+            guessBtn.addEventListener('click', makeGuess);
+            
+            // Xử lý sự kiện nhấn Enter
+            guessInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    makeGuess();
+                }
+            });
+            
+            // Xử lý sự kiện nút chơi lại
+            playAgainBtn.addEventListener('click', resetGame);
+            
+            // Hàm đoán số
+            function makeGuess() {
+                const userGuess = parseInt(guessInput.value);
+                
+                // Kiểm tra đầu vào hợp lệ
+                if (isNaN(userGuess) || userGuess < 1 || userGuess > 100) {
+                    showMessage('Vui lòng nhập một số từ 1 đến 100!', 'error');
+                    return;
+                }
+                
+                // Tăng số lần đoán và cập nhật hiển thị
+                guessCount++;
+                guessCountDisplay.textContent = guessCount;
+                
+                // Thêm vào lịch sử
+                addToHistory(userGuess);
+                
+                // Kiểm tra đoán đúng hay sai
+                if (userGuess === secretNumber) {
+                    // Người chơi thắng
+                    gameWon();
+                } else {
+                    // Đoán sai, đưa ra gợi ý
+                    const hint = userGuess > secretNumber ? 'quá cao' : 'quá thấp';
+                    showMessage(`Số ${userGuess} ${hint}!`, userGuess > secretNumber ? 'high' : 'low');
+                    
+                    // Xóa ô input và focus lại
+                    guessInput.value = '';
+                    guessInput.focus();
+                }
+            }
+            
+            // Hiển thị thông báo
+            function showMessage(msg, type) {
+                messageDisplay.textContent = msg;
+                messageDisplay.classList.remove('hidden', 'bg-red-100', 'bg-yellow-100', 'bg-blue-100', 'text-red-800', 'text-yellow-800', 'text-blue-800');
+                
+                switch(type) {
+                    case 'error':
+                        messageDisplay.classList.add('bg-red-100', 'text-red-800');
+                        break;
+                    case 'high':
+                        messageDisplay.classList.add('bg-yellow-100', 'text-yellow-800');
+                        break;
+                    case 'low':
+                        messageDisplay.classList.add('bg-blue-100', 'text-blue-800');
+                        break;
+                }
+            }
+            
+            // Thêm vào lịch sử đoán
+            function addToHistory(guess) {
+                const historyItem = document.createElement('div');
+                historyItem.classList.add('history-item', 'p-2', 'rounded', 'text-sm', 'flex', 'items-center');
+                
+                const icon = document.createElement('i');
+                if (guess === secretNumber) {
+                    historyItem.classList.add('bg-green-100', 'text-green-800');
+                    icon.classList.add('fas', 'fa-check-circle', 'mr-2');
+                } else if (guess > secretNumber) {
+                    historyItem.classList.add('bg-yellow-50', 'text-yellow-800');
+                    icon.classList.add('fas', 'fa-arrow-up', 'mr-2');
+                } else {
+                    historyItem.classList.add('bg-blue-50', 'text-blue-800');
+                    icon.classList.add('fas', 'fa-arrow-down', 'mr-2');
+                }
+                
+                historyItem.appendChild(icon);
+                historyItem.appendChild(document.createTextNode(`Lần ${guessCount}: Bạn đoán ${guess}`));
+                
+                historyContainer.prepend(historyItem);
+            }
+            
+            // Xử lý khi người chơi thắng
+            function gameWon() {
+                // Cập nhật kỷ lục nếu cần
+                if (guessCount < bestScore) {
+                    bestScore = guessCount;
+                    localStorage.setItem('bestScore', bestScore);
+                }
+                
+                // Hiệu ứng pháo hoa
+                createConfetti();
+                
+                // Hiển thị kết quả
+                gameArea.classList.add('hidden');
+                resultArea.classList.remove('hidden');
+                
+                let message = `Chúc mừng! Bạn đã đoán đúng số ${secretNumber} trong ${guessCount} lần đoán.`;
+                if (guessCount < bestScore) {
+                    message += ` Đây là kỷ lục mới của bạn!`;
+                }
+                winMessage.textContent = message;
+            }
+            
+            // Hàm tạo hiệu ứng pháo hoa
+            function createConfetti() {
+                const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+                
+                for (let i = 0; i < 50; i++) {
+                    setTimeout(function() {
+                        const confetti = document.createElement('div');
+                        confetti.classList.add('confetti');
+                        confetti.style.left = Math.random() * 100 + 'vw';
+                        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                        confetti.style.opacity = Math.random() + 0.5;
+                        confetti.style.width = Math.random() * 15 + 5 + 'px';
+                        confetti.style.height = confetti.style.width;
+                        
+                        document.body.appendChild(confetti);
+                        
+                        setTimeout(function() {
+                            confetti.remove();
+                        }, 3000);
+                    }, i * 50);
+                }
+            }
+            
+            // Hàm reset game
+            function resetGame() {
+                secretNumber = generateRandomNumber(1, 100);
+                guessCount = 0;
+                guessCountDisplay.textContent = guessCount;
+                guessInput.value = '';
+                messageDisplay.classList.add('hidden');
+                historyContainer.innerHTML = '';
+                resultArea.classList.add('hidden');
+                gameArea.classList.remove('hidden');
+                
+                // Hiển thị kỷ lục nếu có
+                if (bestScore !== Infinity) {
+                    document.getElementById('best-score').classList.remove('hidden');
+                    document.getElementById('best-score-value').textContent = bestScore;
+                }
+                
+                // Focus vào ô input
+                guessInput.focus();
+            }
+            
+            // Hàm tạo số ngẫu nhiên
+            function generateRandomNumber(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+        });
+    </script>
+</body>
+</html>
+    <script id="html_badge_script1">
+        window.__genspark_remove_badge_link = "https://www.genspark.ai/api/html_badge/" +
+            "remove_badge?token=To%2FBnjzloZ3UfQdcSaYfDjN%2BpCVnSMqbXbhxKggJjJyLjsCbEqsN3WQOCb%2BL3GsAeh7%2FqHZueIl8v%2FHxTMxg%2BVx5kvvWWj6tJFmFXAckpLeyMFOsdg5m0RJrmy%2Fj3uFi6umoNRcsnXtaG4bUQQhSBo34vkqH%2FnJa3XINNUC%2B5HdzBZBmsEL2biKLm3hiVym10JZrj3yaNAZfO9EkfrvskMJmtEGpXl8tvAR7xTcXbo3ANmOcILRJAZFeEEsdWvDYFJ7ejv0PNctgcnpKET7JQfbgYg3RXVFBHUGCCMor8L5E7pJmdNvAr7Sj%2BNnVTsiOu9zJ5l1ADZG3RtKuKwT%2BzqpaLiztV6O7uM2gRF6X1ROm5JnmkJ36ECUjB0b9lhkavuSxZ6m4bGf0zpVoekln%2B1N1SwzGk7EYHBemPvRL8skhqwiRyL1fXU%2Bu%2FJ1z1GrRREs%2BsSXDrmWi9GVzTFexOte5qQb6z%2BAGev0PXIhwmOLhN0yp8NDlUMl3y8HBKo8Yh%2BLqYeqAqbgRJN3FmT5z22vNAS4zPxGA6vSlAVR0t5pvsowAPr7AeJdreR1H0LqKorw%2FFDv5CiiyJ8weSzxfAWWhKcscqZyJobYybu06yTg%3D";
+        window.__genspark_locale = "en-US";
+        window.__genspark_token = "To/BnjzloZ3UfQdcSaYfDjN+pCVnSMqbXbhxKggJjJyLjsCbEqsN3WQOCb+L3GsAeh7/qHZueIl8v/HxTMxg+Vx5kvvWWj6tJFmFXAckpLeyMFOsdg5m0RJrmy/j3uFi6umoNRcsnXtaG4bUQQhSBo34vkqH/nJa3XINNUC+5HdzBZBmsEL2biKLm3hiVym10JZrj3yaNAZfO9EkfrvskMJmtEGpXl8tvAR7xTcXbo3ANmOcILRJAZFeEEsdWvDYFJ7ejv0PNctgcnpKET7JQfbgYg3RXVFBHUGCCMor8L5E7pJmdNvAr7Sj+NnVTsiOu9zJ5l1ADZG3RtKuKwT+zqpaLiztV6O7uM2gRF6X1ROm5JnmkJ36ECUjB0b9lhkavuSxZ6m4bGf0zpVoekln+1N1SwzGk7EYHBemPvRL8skhqwiRyL1fXU+u/J1z1GrRREs+sSXDrmWi9GVzTFexOte5qQb6z+AGev0PXIhwmOLhN0yp8NDlUMl3y8HBKo8Yh+LqYeqAqbgRJN3FmT5z22vNAS4zPxGA6vSlAVR0t5pvsowAPr7AeJdreR1H0LqKorw/FDv5CiiyJ8weSzxfAWWhKcscqZyJobYybu06yTg=";
+    </script>
+    
